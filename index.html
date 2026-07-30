@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ZoomReel</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        width: 100%; min-height: 100vh;
+        font-family: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+        font-size: 15px;
+        background: #0b0b12; color: #e7e7ef;
+      }
+      .layout { display: flex; min-height: 100vh; }
+      .sidebar {
+        width: 290px; flex-shrink: 0; height: 100vh; position: sticky; top: 0;
+        overflow-y: auto; background: #0d0d16; border-right: 1px solid #ffffff12;
+        padding: 20px 16px;
+      }
+      /* Keeps this looking like a compact control panel instead of stretching
+         edge-to-edge if the window is maximized on a large screen. */
+      .content { max-width: 640px; margin: 0 auto; padding: 18px; flex: 1; min-width: 0; }
+      .brand { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+      .dot { width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; display: block; }
+      .brand b { font-size: 19px; letter-spacing: .2px; }
+      p.sub { margin: 6px 0 14px; font-size: 14px; line-height: 1.4; color: #9a9ab0; }
+
+      .source-label { font-size: 13px; color: #6f6f86; margin: 10px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+      /* auto-fill instead of a fixed column count — thumbnails stay a sane,
+         sharp size and more of them appear per row as the window widens,
+         rather than 2 columns stretching (and blurring) to fill any width. */
+      .sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+      .source {
+        border: 2px solid transparent; border-radius: 8px; overflow: hidden; cursor: pointer;
+        background: #17172180;
+      }
+      .source.sel { border-color: #8b5cf6; }
+      .source img { width: 100%; aspect-ratio: 16 / 9; height: auto; object-fit: cover; display: block; background: #000; }
+      .source .name { font-size: 12px; padding: 4px 6px; color: #c7c7d6; white-space: nowrap;
+                       overflow: hidden; text-overflow: ellipsis; }
+
+      .row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+      .row + .row { border-top: 1px solid #ffffff0f; }
+      .row-label { display: flex; align-items: center; gap: 9px; font-size: 15px; }
+      select {
+        width: 100%; margin-top: 6px; padding: 7px 8px; border-radius: 8px;
+        background: #17172180; color: #e7e7ef; border: 1px solid #ffffff14;
+        font-size: 14px; display: none;
+      }
+      select.show { display: block; }
+
+      .switch { position: relative; width: 38px; height: 22px; cursor: pointer; flex-shrink: 0; }
+      .switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+      .track { position: absolute; inset: 0; background: #2a2a3a; border-radius: 999px; transition: .15s; pointer-events: none; }
+      .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+                      border-radius: 50%; background: #fff; transition: .15s; }
+      .switch input:checked + .track { background: #8b5cf6; }
+      .switch input:checked + .track::after { transform: translateX(16px); }
+
+      hr { border: 0; border-top: 1px solid #ffffff10; margin: 14px 0; }
+
+      #camWrap {
+        width: 80px; height: 80px; border-radius: 50%; overflow: hidden; display: none;
+        border: 2px solid #ffffff22; background: #000; margin: 10px auto;
+      }
+      #camWrap.show { display: block; }
+      #camPreview { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+      button.cta {
+        width: 100%; border: 0; border-radius: 12px; padding: 14px 16px;
+        font-size: 16px; font-weight: 600; cursor: pointer; color: #fff;
+        background: linear-gradient(135deg,#8b5cf6,#6366f1);
+      }
+      button.cta:hover { filter: brightness(1.08); }
+      button.cta:active { transform: scale(.98); }
+      button.cta.rec { background: linear-gradient(135deg,#f43f5e,#e11d48); }
+      button.cta:disabled { opacity: .65; cursor: default; }
+
+      .timer { text-align: center; font-variant-numeric: tabular-nums; font-size: 14px; color: #9a9ab0; margin-top: 8px; }
+      .err { margin-top: 10px; font-size: 14px; color: #fda4af; line-height: 1.4; display: none; }
+
+      .sidebar-head { font-size: 13px; color: #8b8ba1; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; font-weight: 600; }
+      .recent-list { display: flex; flex-direction: column; gap: 6px; }
+      .recent-item {
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        padding: 10px 12px; border-radius: 8px; background: #17172180; cursor: pointer;
+      }
+      .recent-item:hover { background: #22223080; }
+      .recent-item .meta { font-size: 14px; color: #dcdce6; }
+      .recent-item .actions { display: flex; gap: 2px; flex-shrink: 0; }
+      .recent-item .edit, .recent-item .del {
+        border: 0; background: none; color: #8b8ba1; cursor: pointer;
+        padding: 6px; border-radius: 6px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      .recent-item .edit:hover { background: #2a2a3a; color: #dcdce6; }
+      .recent-item .del:hover { background: #3a1a1a; color: #fda4af; }
+      .recent-item .edit svg, .recent-item .del svg { width: 16px; height: 16px; display: block; }
+      .recent-empty { font-size: 13px; color: #6f6f86; padding: 2px; line-height: 1.5; }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-head">📼 Previous recordings</div>
+      <div class="recent-list" id="recentList"></div>
+    </aside>
+    <div class="content">
+    <div class="brand"><img src="logo.svg" class="dot" alt="" /><b>ZoomReel</b></div>
+    <p class="sub" id="sub">Pick what to record.</p>
+
+    <div class="source-label">🖥️ Entire screens</div>
+    <div class="sources" id="screenSources"></div>
+
+    <div class="source-label">🪟 Specific windows</div>
+    <div class="sources" id="windowSources"></div>
+
+    <div class="row">
+      <div class="row-label">🎥 Camera</div>
+      <label class="switch"><input type="checkbox" id="camToggle" /><span class="track"></span></label>
+    </div>
+    <select id="camSelect"></select>
+
+    <div class="row">
+      <div class="row-label">🎙️ Microphone</div>
+      <label class="switch"><input type="checkbox" id="micToggle" /><span class="track"></span></label>
+    </div>
+    <select id="micSelect"></select>
+
+    <div class="row">
+      <div class="row-label">🔊 System audio</div>
+      <!-- OFF by default: this records everything the PC plays, which is how
+           audio from an earlier take ends up inside a new one. Opt in. -->
+      <label class="switch"><input type="checkbox" id="sysToggle" /><span class="track"></span></label>
+    </div>
+
+    <div id="camWrap"><video id="camPreview" autoplay muted playsinline></video></div>
+
+    <hr />
+
+    <button class="cta" id="btn">Start recording</button>
+    <div class="timer" id="timer" style="display:none">0:00</div>
+    <div class="err" id="err"></div>
+    </div>
+    </div>
+
+    <script src="index.js"></script>
+  </body>
+</html>

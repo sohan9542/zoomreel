@@ -1,0 +1,271 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>ZoomReel Editor</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        font-family: "Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+        font-size: 14px;
+        background: #08080e; color: #e7e7ef; overflow: hidden;
+      }
+      .app { display: grid; grid-template-columns: 1fr 340px; height: 100vh; }
+      .stage {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        padding: 24px; gap: 16px; min-width: 0; height: 100%; overflow: auto;
+      }
+      .canvas-wrap {
+        width: 100%; flex: 1; display: flex; align-items: center; justify-content: center;
+        min-height: 0; position: relative;
+      }
+      canvas { max-width: 100%; max-height: 100%; border-radius: 12px;
+               box-shadow: 0 30px 80px rgba(0,0,0,.55); background: #000; }
+      canvas.manual-mode { cursor: crosshair; }
+      .zoom-select-box {
+        position: absolute; display: none; pointer-events: none;
+        border: 2px solid #8b5cf6; background: rgba(139,92,246,.18); border-radius: 2px;
+      }
+      .transport {
+        display: flex; align-items: center; gap: 12px; width: 100%; max-width: 900px;
+      }
+      .transport button.icon {
+        border: 0; width: 42px; height: 42px; border-radius: 12px; cursor: pointer;
+        background: #17172180; color: #fff; font-size: 16px;
+      }
+      .transport button.icon:hover { background: #22223080; }
+      input[type="range"].scrub { flex: 1; accent-color: #8b5cf6; }
+      .time { font-variant-numeric: tabular-nums; font-size: 13px; color: #9a9ab0; min-width: 84px; text-align: right; }
+
+      .panel { background: #0d0d16; border-left: 1px solid #ffffff12; padding: 20px;
+               overflow-y: auto; }
+      .panel h1 { font-size: 18px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+      .panel .logo { width: 18px; height: 18px; border-radius: 5px;
+                     background: linear-gradient(135deg,#8b5cf6,#6366f1); }
+      .panel .hint { font-size: 13px; color: #8b8ba1; margin: 0 0 18px; line-height: 1.5; }
+      .group { margin-bottom: 18px; }
+      .row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .row label { font-size: 14px; color: #dcdce6; }
+      .val { font-size: 13px; color: #8b8ba1; font-variant-numeric: tabular-nums; }
+      input[type="range"] { width: 100%; accent-color: #8b5cf6; }
+      .switch { position: relative; width: 40px; height: 23px; cursor: pointer; flex-shrink: 0; }
+      .switch input {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        margin: 0; opacity: 0; cursor: pointer; z-index: 1;
+      }
+      .track { position: absolute; inset: 0; background: #2a2a3a; border-radius: 999px; transition: .15s; pointer-events: none; }
+      .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 17px; height: 17px;
+                      border-radius: 50%; background: #fff; transition: .15s; }
+      .switch input:checked + .track { background: #8b5cf6; }
+      .switch input:checked + .track::after { transform: translateX(17px); }
+      .bgs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+      .bgs button { height: 34px; border-radius: 9px; border: 2px solid transparent; cursor: pointer; }
+      .bgs button.sel { border-color: #fff; }
+      .export-group { display: flex; gap: 8px; margin-top: 6px; }
+      .export-group button {
+        flex: 1; border: 0; border-radius: 12px; padding: 13px 4px;
+        font-size: 13px; font-weight: 700; color: #fff; cursor: pointer;
+        background: linear-gradient(135deg,#8b5cf6,#6366f1);
+      }
+      .export-group button:hover { filter: brightness(1.08); }
+      .export-group button:disabled { opacity: .6; cursor: default; }
+      .exp-note { font-size: 12px; color: #8b8ba1; margin-top: 8px; text-align: center; }
+      .empty { display: flex; height: 100vh; align-items: center; justify-content: center;
+               color: #8b8ba1; font-size: 14px; }
+      hr { border: 0; border-top: 1px solid #ffffff10; margin: 18px 0; }
+      .corners { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .corners button {
+        height: 40px; border-radius: 9px; border: 2px solid transparent; cursor: pointer;
+        background: #17172180; color: #8b8ba1; font-size: 12px;
+      }
+      .corners button.sel { border-color: #8b5cf6; color: #fff; background: #8b5cf62a; }
+      .diag {
+        display: none; margin-bottom: 18px; padding: 10px; border-radius: 10px;
+        background: #3a1a1a; border: 1px solid #7f1d1d; font-size: 12px; color: #fca5a5;
+        line-height: 1.5; word-break: break-word;
+      }
+      .timeline-wrap {
+        position: relative; flex: 1; height: 52px; border-radius: 8px; overflow: hidden;
+        background: #000; cursor: pointer; user-select: none;
+      }
+      .filmstrip { display: flex; width: 100%; height: 100%; }
+      .filmstrip .thumb { flex: 1; height: 100%; object-fit: cover; display: block; background: #1a1a24; }
+      .segments { position: absolute; inset: 0; }
+      .seg-block { position: absolute; top: 0; bottom: 0; box-sizing: border-box; }
+      .seg-block + .seg-block { border-left: 1px solid rgba(255,255,255,.35); }
+      .seg-block.deleted {
+        background: repeating-linear-gradient(45deg, rgba(244,63,94,.45), rgba(244,63,94,.45) 6px, rgba(0,0,0,.55) 6px, rgba(0,0,0,.55) 12px);
+      }
+      .seg-block.selected { border: 2px solid #8b5cf6; }
+      .playhead {
+        position: absolute; top: 0; bottom: 0; width: 2px; background: #fff;
+        box-shadow: 0 0 6px rgba(255,255,255,.8); pointer-events: none;
+      }
+      .btn-group { display: flex; gap: 8px; }
+      .btn-group button {
+        flex: 1; border: 0; border-radius: 9px; padding: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+        background: #8b5cf6; color: #fff;
+      }
+      .btn-group button:hover { filter: brightness(1.1); }
+      .btn-group button:disabled { opacity: .5; cursor: default; }
+
+      .mode-switch { display: flex; gap: 6px; background: #17172180; border-radius: 9px; padding: 3px; }
+      .mode-switch button {
+        flex: 1; border: 0; background: none; color: #8b8ba1; cursor: pointer;
+        padding: 8px; border-radius: 7px; font-size: 13px; font-weight: 600;
+      }
+      .mode-switch button.sel { background: #8b5cf6; color: #fff; }
+
+      .zoom-track-wrap {
+        position: relative; width: 100%; max-width: 900px; height: 20px;
+        margin-top: -4px;
+      }
+      .zoom-track {
+        position: relative; width: 100%; height: 100%; border-radius: 6px;
+        background: #17172180; overflow: visible;
+      }
+      .zoom-block {
+        position: absolute; top: 0; bottom: 0; border-radius: 6px; cursor: grab;
+        background: linear-gradient(135deg,#8b5cf6,#6366f1); opacity: .85;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 10px; font-weight: 700; color: #fff; user-select: none;
+        min-width: 10px;
+      }
+      .zoom-block.selected { outline: 2px solid #fff; opacity: 1; }
+      .zoom-block .handle {
+        position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize;
+      }
+      .zoom-block .handle.left { left: 0; }
+      .zoom-block .handle.right { right: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="app" style="display:none">
+      <div class="stage">
+        <div class="canvas-wrap">
+          <canvas id="c"></canvas>
+          <div class="zoom-select-box" id="zoomSelectBox"></div>
+        </div>
+        <div class="transport">
+          <button class="icon" id="play">▶</button>
+          <div class="timeline-wrap" id="timelineWrap">
+            <div class="filmstrip" id="filmstrip"></div>
+            <div class="segments" id="segmentsOverlay"></div>
+            <div class="playhead" id="playhead"></div>
+          </div>
+          <span class="time" id="time">0:00 / 0:00</span>
+          <button class="icon" id="mute" title="Mute preview">🔈</button>
+        </div>
+        <div class="zoom-track-wrap" id="zoomTrackWrap" style="display:none">
+          <div class="zoom-track" id="zoomTrack"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h1><span class="logo"></span> ZoomReel</h1>
+        <p class="hint">Cinematic auto-zoom with silky camera motion. Tune feel, then export.</p>
+
+        <div class="diag" id="camDiag"></div>
+
+        <div class="group">
+          <div class="btn-group">
+            <button id="recordAgainBtn">🔴 Record again</button>
+            <button id="discardBtn" style="background:#3f1d2b;color:#fda4af">🗑 Discard</button>
+          </div>
+        </div>
+
+        <hr />
+
+        <div class="group">
+          <div class="row"><label>Zoom mode</label></div>
+          <div class="mode-switch">
+            <button id="modeAuto" class="sel">Auto</button>
+            <button id="modeManual">Manual</button>
+          </div>
+          <p class="hint" id="modeHint" style="margin:8px 0 0">Zooms in on clicks and typing, eases out when you move or go idle.</p>
+        </div>
+
+        <div class="group" id="zoomLevelGroup">
+          <div class="row"><label>Zoom level</label><span class="val" id="zoomV">1.7×</span></div>
+          <input type="range" id="zoom" min="1" max="3.5" step="0.05" value="1.7" />
+        </div>
+
+        <div class="group">
+          <div class="row"><label>Smoothness</label><span class="val" id="smoothV">Silky</span></div>
+          <input type="range" id="smooth" min="0.03" max="0.30" step="0.01" value="0.06" />
+        </div>
+
+        <hr />
+
+        <div class="group">
+          <div class="row"><label>Background</label></div>
+          <div class="bgs" id="bgs"></div>
+        </div>
+
+        <div class="group">
+          <div class="row"><label>Padding</label><span class="val" id="padV">6%</span></div>
+          <input type="range" id="pad" min="0" max="0.16" step="0.005" value="0.06" />
+        </div>
+
+        <div class="group">
+          <div class="row"><label>Corner radius</label><span class="val" id="radV">16</span></div>
+          <input type="range" id="rad" min="0" max="48" step="1" value="16" />
+        </div>
+
+        <div class="group">
+          <div class="row">
+            <label for="cursor">Click highlights</label>
+            <label class="switch"><input type="checkbox" id="cursor" checked /><span class="track"></span></label>
+          </div>
+          <p class="hint" style="margin:0">Shows a colored ripple at each click/keypress. Your actual mouse cursor is already part of the recording itself.</p>
+        </div>
+
+        <hr />
+
+        <div class="group" id="camGroup" style="display:none">
+          <div class="row">
+            <label for="camToggle">Webcam bubble</label>
+            <label class="switch"><input type="checkbox" id="camToggle" checked /><span class="track"></span></label>
+          </div>
+          <div class="row"><label>Position</label></div>
+          <div class="corners" id="camCorners">
+            <button data-corner="tl">Top left</button>
+            <button data-corner="tr">Top right</button>
+            <button data-corner="bl">Bottom left</button>
+            <button data-corner="br">Bottom right</button>
+          </div>
+          <div class="row" style="margin-top:10px"><label>Size</label></div>
+          <input type="range" id="camSizeCtl" min="0.1" max="0.32" step="0.01" value="0.18" />
+        </div>
+
+        <hr />
+
+        <div class="group">
+          <div class="row"><label>Trim</label></div>
+          <p class="hint" style="margin:0 0 8px">Click the filmstrip to scrub and select a clip. Split at the playhead, then delete the part you don't want — removed clips are skipped in preview and left out of the export.</p>
+          <div class="btn-group">
+            <button id="splitBtn">✂ Split</button>
+            <button id="deleteBtn" disabled>Delete clip</button>
+          </div>
+        </div>
+
+        <hr />
+
+        <div class="export-group">
+          <button id="exportWebm">WebM</button>
+          <button id="exportMp4">MP4</button>
+          <button id="exportGif">GIF</button>
+        </div>
+        <p class="exp-note" id="expNote">Export renders in real time (about the clip's length).</p>
+      </div>
+    </div>
+
+    <div id="empty" class="empty">Loading recording…</div>
+
+    <script src="camera.js"></script>
+    <script src="gif.js"></script>
+    <script src="editor.js"></script>
+  </body>
+</html>

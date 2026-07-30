@@ -1,0 +1,43 @@
+{
+  "name": "zoomreel-software",
+  "productName": "ZoomReel",
+  "version": "1.0.0",
+  "description": "Auto-zoom screen recorder — desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "electron": "^32.3.3",
+    "electron-builder": "^25.0.0"
+  },
+  "dependencies": {
+    "uiohook-napi": "^1.5.4"
+  },
+  "build": {
+    "appId": "com.zoomreel.app",
+    "productName": "ZoomReel",
+    "npmRebuild": false,
+    "directories": {
+      "output": "dist5"
+    },
+    "files": [
+      "**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,.git}",
+      "!dist*/**/*",
+      "!build/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

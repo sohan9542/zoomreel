@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+
+# Electron / electron-builder output
+dist/
+dist2/
+dist3/
+dist4/
+dist5/
+dist*/
+out/
+release/
+*.exe
+*.exe.blockmap
+*.dmg
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.blockmap
+builder-debug.yml
+builder-effective-config.yaml
+.icon-ico/
+
+# Logs & local dumps
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+e-err.txt
+e-out.txt
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS junk
+.DS_Store
+.DS_Store?
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# Editors / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Optional local recordings if ever saved in-repo
+recordings/
+*.webm
+*.mp4
+*.mov
