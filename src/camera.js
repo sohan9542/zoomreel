@@ -10,8 +10,8 @@ const ZR_CAMERA = (() => {
     zoomLevel: 1.7,
     zoomInMs: 1000,
     zoomOutMs: 1300,
-    mergeMs: 4000,   // actions closer than this share one zoom segment
-    holdMs: 1800,    // stay zoomed this long after the last action
+    mergeMs: 4000, // actions closer than this share one zoom segment
+    holdMs: 1800, // stay zoomed this long after the last action
     pathWindowMs: 150,
   };
 
@@ -67,13 +67,16 @@ const ZR_CAMERA = (() => {
     const sigma = windowMs * 0.38;
     const denom = 2 * sigma * sigma;
     const out = new Array(moves.length);
-    let lo = 0, hi = 0;
+    let lo = 0,
+      hi = 0;
     for (let i = 0; i < moves.length; i++) {
       const e = moves[i];
       while (lo < moves.length && moves[lo].t < e.t - windowMs) lo++;
       if (hi < lo) hi = lo;
       while (hi < moves.length && moves[hi].t <= e.t + windowMs) hi++;
-      let wx = 0, wy = 0, w = 0;
+      let wx = 0,
+        wy = 0,
+        w = 0;
       for (let j = lo; j < hi; j++) {
         const dt = moves[j].t - e.t;
         const k = Math.exp(-(dt * dt) / denom);
@@ -89,11 +92,12 @@ const ZR_CAMERA = (() => {
   function catmullRom(p0, p1, p2, p3, t) {
     const t2 = t * t;
     const t3 = t2 * t;
-    return 0.5 * (
-      (2 * p1) +
-      (-p0 + p2) * t +
-      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-      (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+    return (
+      0.5 *
+      (2 * p1 +
+        (-p0 + p2) * t +
+        (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+        (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
     );
   }
 
@@ -115,7 +119,7 @@ const ZR_CAMERA = (() => {
       const dt = 33;
       const p0 = sample(Math.max(0, t - dt));
       const p1 = sample(t + dt);
-      return { x: (p1.x - p0.x) / (2 * dt) * 1000, y: (p1.y - p0.y) / (2 * dt) * 1000 };
+      return { x: ((p1.x - p0.x) / (2 * dt)) * 1000, y: ((p1.y - p0.y) / (2 * dt)) * 1000 };
     }
 
     return { sample, velocity };
@@ -125,15 +129,17 @@ const ZR_CAMERA = (() => {
     if (t <= pts[0].t) return { x: pts[0].x, y: pts[0].y };
     if (t >= pts[pts.length - 1].t) return { x: pts[pts.length - 1].x, y: pts[pts.length - 1].y };
 
-    let lo = 0, hi = pts.length - 1;
+    let lo = 0,
+      hi = pts.length - 1;
     while (lo < hi) {
       const m = (lo + hi + 1) >> 1;
       if (pts[m].t <= t) lo = m;
       else hi = m - 1;
     }
     const i = lo;
-    const a = pts[i], b = pts[i + 1] || a;
-    const span = (b.t - a.t) || 1;
+    const a = pts[i],
+      b = pts[i + 1] || a;
+    const span = b.t - a.t || 1;
     const u = clamp((t - a.t) / span, 0, 1);
 
     return {
@@ -144,7 +150,10 @@ const ZR_CAMERA = (() => {
 
   function attachCursorToKeys(events, path) {
     for (const e of events) {
-      if ((e.k === "k" || e.k === "c" || e.k === "h") && (!Number.isFinite(e.x) || !Number.isFinite(e.y))) {
+      if (
+        (e.k === "k" || e.k === "c" || e.k === "h") &&
+        (!Number.isFinite(e.x) || !Number.isFinite(e.y))
+      ) {
         const p = path.sample(e.t);
         e.x = p.x;
         e.y = p.y;
@@ -167,12 +176,8 @@ const ZR_CAMERA = (() => {
       }
     }
     for (const s of segs) {
-      s.end = Math.min(
-        Math.max(s.lastT + cfg.holdMs, s.start + cfg.zoomInMs + 400),
-        totalMs
-      );
-      s.zEnd = lerp(1, cfg.zoomLevel,
-        EASE_IN_OUT(clamp((s.end - s.start) / cfg.zoomInMs, 0, 1)));
+      s.end = Math.min(Math.max(s.lastT + cfg.holdMs, s.start + cfg.zoomInMs + 400), totalMs);
+      s.zEnd = lerp(1, cfg.zoomLevel, EASE_IN_OUT(clamp((s.end - s.start) / cfg.zoomInMs, 0, 1)));
     }
     return segs;
   }
@@ -201,8 +206,7 @@ const ZR_CAMERA = (() => {
       segs.push({ start: trig.t, lastT: trig.t, end });
     }
     for (const s of segs) {
-      s.zEnd = lerp(1, cfg.zoomLevel,
-        EASE_IN_OUT(clamp((s.end - s.start) / cfg.zoomInMs, 0, 1)));
+      s.zEnd = lerp(1, cfg.zoomLevel, EASE_IN_OUT(clamp((s.end - s.start) / cfg.zoomInMs, 0, 1)));
     }
     return segs;
   }
@@ -230,11 +234,13 @@ const ZR_CAMERA = (() => {
     if (track.length < 3 || windowMs < 16) return track;
     const sigma = windowMs * 0.38;
     const denom = 2 * sigma * sigma;
-    const step = (track[1].t - track[0].t) || 16;
+    const step = track[1].t - track[0].t || 16;
     const radius = Math.ceil(windowMs / step);
     const out = new Array(track.length);
     for (let i = 0; i < track.length; i++) {
-      let wx = 0, wy = 0, w = 0;
+      let wx = 0,
+        wy = 0,
+        w = 0;
       const lo = Math.max(0, i - radius);
       const hi = Math.min(track.length - 1, i + radius);
       for (let j = lo; j <= hi; j++) {
@@ -258,7 +264,8 @@ const ZR_CAMERA = (() => {
   function simulateCamera(camPath, segs, totalMs, cfg) {
     const stepMs = 16;
     const track = [];
-    let cx = 0.5, cy = 0.5;
+    let cx = 0.5,
+      cy = 0.5;
     let zoomed = false;
 
     for (let t = 0; t <= totalMs + stepMs; t += stepMs) {
@@ -311,7 +318,9 @@ const ZR_CAMERA = (() => {
     const sorted = [...zooms].sort((a, b) => a.start - b.start);
 
     for (let t = 0; t <= totalMs + stepMs; t += stepMs) {
-      let cx = 0.5, cy = 0.5, zoom = 1;
+      let cx = 0.5,
+        cy = 0.5,
+        zoom = 1;
       for (const seg of sorted) {
         if (t < seg.start || t >= seg.end) continue;
         const zoomInMs = Math.min(cfg.zoomInMs, seg.end - seg.start);
@@ -337,14 +346,16 @@ const ZR_CAMERA = (() => {
   function sampleTrack(track, t) {
     if (t <= track[0].t) return track[0];
     if (t >= track[track.length - 1].t) return track[track.length - 1];
-    let lo = 0, hi = track.length - 1;
+    let lo = 0,
+      hi = track.length - 1;
     while (lo < hi) {
       const m = (lo + hi + 1) >> 1;
       if (track[m].t <= t) lo = m;
       else hi = m - 1;
     }
-    const a = track[lo], b = track[lo + 1];
-    const u = (t - a.t) / ((b.t - a.t) || 1);
+    const a = track[lo],
+      b = track[lo + 1];
+    const u = (t - a.t) / (b.t - a.t || 1);
     return {
       zoom: lerp(a.zoom, b.zoom, u),
       cx: lerp(a.cx, b.cx, u),
@@ -352,6 +363,17 @@ const ZR_CAMERA = (() => {
     };
   }
 
+  /**
+   * @typedef {{ t: number, x?: number, y?: number, k: string }} InputEvent
+   * @typedef {{ zoom?: number, smooth?: number, zoomMode?: "auto"|"manual", manualZooms?: Array<{start:number,end:number,cx:number,cy:number,zoom:number}> }} UiSettings
+   * @typedef {{ zoomLevel: number, zoomInMs: number, zoomOutMs: number, mergeMs: number, holdMs: number, cameraWindowMs: number, pathWindowMs: number }} CameraConfig
+   */
+
+  /**
+   * Map editor UI controls onto internal camera timing/zoom config.
+   * @param {UiSettings} ui
+   * @returns {CameraConfig}
+   */
   function settingsFromUI(ui) {
     const s = ui.smooth ?? 0.06;
     return {
@@ -369,11 +391,15 @@ const ZR_CAMERA = (() => {
     };
   }
 
+  /**
+   * Precompute cursor path + auto/manual camera tracks for a recording.
+   * @param {InputEvent[]} rawEvents
+   * @param {number} totalMs
+   * @param {UiSettings} uiSettings
+   */
   function prepare(rawEvents, totalMs, uiSettings) {
     const cfg = settingsFromUI(uiSettings);
-    const events = rawEvents
-      .filter((e) => Number.isFinite(e.t))
-      .sort((a, b) => a.t - b.t);
+    const events = rawEvents.filter((e) => Number.isFinite(e.t)).sort((a, b) => a.t - b.t);
 
     const moves = events.filter((e) => e.k === "m" && Number.isFinite(e.x) && Number.isFinite(e.y));
     const path = buildPath(moves, cfg.pathWindowMs);
@@ -383,7 +409,8 @@ const ZR_CAMERA = (() => {
     attachCursorToKeys(events, path);
     // "h" = hold pulse (user inside an extension popup) — extends the session.
     const triggers = events.filter(
-      (e) => (e.k === "c" || e.k === "k" || e.k === "h") && Number.isFinite(e.x) && Number.isFinite(e.y)
+      (e) =>
+        (e.k === "c" || e.k === "k" || e.k === "h") && Number.isFinite(e.x) && Number.isFinite(e.y)
     );
     const scrolls = events.filter((e) => e.k === "s");
 
@@ -407,6 +434,12 @@ const ZR_CAMERA = (() => {
     return { path, track, triggers, segments, cfg, manualTrack };
   }
 
+  /**
+   * Sample camera framing + cursor state at time t (ms).
+   * @param {number} t
+   * @param {ReturnType<typeof prepare>} prepared
+   * @param {UiSettings} uiSettings
+   */
   function evaluate(t, prepared, uiSettings) {
     const cursor = prepared.path.sample(t);
     const vel = prepared.path.velocity(t);
@@ -420,3 +453,8 @@ const ZR_CAMERA = (() => {
 
   return { prepare, evaluate, settingsFromUI, DEFAULTS, EASE_IN_OUT, EASE_OUT };
 })();
+
+// Dual export: classic <script> keeps ZR_CAMERA in page scope; Node tests use require().
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = ZR_CAMERA;
+}

@@ -1,19 +1,30 @@
 {
-  "name": "zoomreel-software",
+  "name": "zoomreel",
   "productName": "ZoomReel",
   "version": "1.0.0",
-  "description": "Auto-zoom screen recorder — desktop app",
-  "main": "main.js",
-  "scripts": {
-    "start": "electron .",
-    "build": "electron-builder"
-  },
-  "author": "",
+  "description": "Auto-zoom screen recorder — Electron desktop app with cinematic click-follow zoom and a built-in editor",
+  "main": "src/main.js",
+  "author": "Sohanur Rahman",
   "license": "UNLICENSED",
   "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "node --test test/**/*.test.js",
+    "ci": "npm run lint && npm run format:check && npm test"
+  },
   "devDependencies": {
+    "@eslint/js": "^9.21.0",
     "electron": "^32.3.3",
-    "electron-builder": "^25.0.0"
+    "electron-builder": "^25.0.0",
+    "eslint": "^9.21.0",
+    "eslint-config-prettier": "^10.0.1",
+    "globals": "^15.15.0",
+    "prettier": "^3.5.2"
   },
   "dependencies": {
     "uiohook-napi": "^1.5.4"
@@ -23,13 +34,17 @@
     "productName": "ZoomReel",
     "npmRebuild": false,
     "directories": {
-      "output": "dist5"
+      "output": "dist",
+      "buildResources": "build"
     },
     "files": [
-      "**/*",
+      "src/**/*",
+      "build/icon.png",
+      "package.json",
       "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,.git}",
-      "!dist*/**/*",
-      "!build/**/*"
+      "!dist/**/*",
+      "!test/**/*",
+      "!**/*.test.js"
     ],
     "win": {
       "target": "nsis",

@@ -1,7 +1,16 @@
 // ZoomReel desktop — Electron main process.
 // Owns: window management, screen-source picking, global cursor/click
 // tracking (for camera.js's auto-zoom), and recording storage on disk.
-const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog, Menu, session } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  desktopCapturer,
+  screen,
+  dialog,
+  Menu,
+  session,
+} = require("electron");
 const path = require("path");
 const fs = require("fs");
 const fsp = fs.promises;
@@ -19,13 +28,15 @@ const { pathToFileURL } = require("url");
 const DISABLED_FEATURES = ["AllowWgcScreenCapturer", "AllowWgcWindowCapturer"];
 app.commandLine.appendSwitch(
   "disable-features",
-  [app.commandLine.getSwitchValue("disable-features"), ...DISABLED_FEATURES].filter(Boolean).join(",")
+  [app.commandLine.getSwitchValue("disable-features"), ...DISABLED_FEATURES]
+    .filter(Boolean)
+    .join(",")
 );
 
 let uIOhook = null;
 try {
   ({ uIOhook } = require("uiohook-napi"));
-} catch (e) {
+} catch {
   // Optional — cursor movement tracking still works without it, just no
   // click/keypress-triggered zoom bursts.
 }
@@ -59,7 +70,7 @@ function clamp01(v) {
 
 let mainWindow = null;
 
-const appIcon = path.join(__dirname, "build", "icon.png");
+const appIcon = path.join(__dirname, "..", "build", "icon.png");
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -81,7 +92,7 @@ function createMainWindow() {
     mainWindow.maximize();
     mainWindow.show();
   });
-  mainWindow.loadFile("index.html");
+  mainWindow.loadFile(path.join(__dirname, "index.html"));
   // Closing the recorder closes the whole app, editors included. Otherwise
   // "I closed the software" can silently leave editor windows (and their
   // audio playback) running in the background.
@@ -118,11 +129,17 @@ app.whenReady().then(() => {
   // getSources() do a real capture of EVERY open window before it returns —
   // seconds of delay, during which the already-open desktop-audio loopback
   // keeps buffering. That buffered pre-roll is what leads the recording.
-  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
-    const sources = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } });
-    const match = sources.find((s) => s.id === pendingCapture?.sourceId) || sources[0];
-    callback({ video: match });
-  }, { useSystemPicker: false });
+  session.defaultSession.setDisplayMediaRequestHandler(
+    async (request, callback) => {
+      const sources = await desktopCapturer.getSources({
+        types: ["screen", "window"],
+        thumbnailSize: { width: 0, height: 0 },
+      });
+      const match = sources.find((s) => s.id === pendingCapture?.sourceId) || sources[0];
+      callback({ video: match });
+    },
+    { useSystemPicker: false }
+  );
 
   createMainWindow();
   app.on("activate", () => {
@@ -135,7 +152,9 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", () => {
-  try { if (uIOhook) uIOhook.stop(); } catch (e) {}
+  try {
+    if (uIOhook) uIOhook.stop();
+  } catch {}
 });
 
 /* ---------- screen source picking ---------- */
@@ -249,12 +268,15 @@ function closeEditorWindows(except = null) {
       // for seconds while it's busy decoding, and an editor that keeps playing
       // that long is exactly what loopback bakes into the next take.
       w.destroy();
-    } catch (e) {}
+    } catch {}
   }
 }
 
 ipcMain.on("zr:stop-tracking", () => {
-  if (trackingInterval) { clearInterval(trackingInterval); trackingInterval = null; }
+  if (trackingInterval) {
+    clearInterval(trackingInterval);
+    trackingInterval = null;
+  }
   trackingTarget = null;
   trackingBounds = null;
   // Do NOT unsilence here — stopTracking runs at the start of stopRecording,
@@ -338,7 +360,7 @@ ipcMain.handle("zr:list-sessions", async () => {
     try {
       const meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
       sessions.push({ id, startEpoch: meta.startEpoch || Number(id), hasWebcam: !!meta.hasWebcam });
-    } catch (e) {}
+    } catch {}
   }
   return sessions.sort((a, b) => b.startEpoch - a.startEpoch);
 });
@@ -400,7 +422,7 @@ ipcMain.on("zr:open-editor", (event, id) => {
   // One editor at a time — an old take left playing is exactly what system
   // audio loopback used to bake into the next recording.
   closeEditorWindows(win);
-  win.loadFile("editor.html", { query: { id: String(id) } });
+  win.loadFile(path.join(__dirname, "editor.html"), { query: { id: String(id) } });
 });
 
 /* ---------- export save ---------- */

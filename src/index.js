@@ -21,15 +21,24 @@ let sources = [];
 let selectedSource = null;
 let recording = false;
 let sessionId = null;
-let screenRecorder = null, camRecorder = null, micRecorder = null;
-let displayStream = null, sysStream = null, micStream = null, camStream = null, audioCtx = null, audioNodes = [];
+let screenRecorder = null,
+  camRecorder = null,
+  micRecorder = null;
+let displayStream = null,
+  sysStream = null,
+  micStream = null,
+  camStream = null,
+  audioCtx = null,
+  audioNodes = [];
 let events = [];
-let startedAt = 0, timerHandle = null;
+let startedAt = 0,
+  timerHandle = null;
 let stopInputTracking = null;
 // Mic and system audio get mixed into one track, so once a take is recorded
 // there's no way to tell which input a given sound came from. These watch each
 // input separately while recording and the answer lands in meta.json.
-let audioMeters = [], meterCtx = null;
+let audioMeters = [],
+  meterCtx = null;
 
 function showErr(m) {
   errEl.textContent = m;
@@ -50,7 +59,8 @@ function describeTrack(t) {
 
 function fmt(sec) {
   sec = Math.max(0, sec | 0);
-  const m = (sec / 60) | 0, s = sec % 60;
+  const m = (sec / 60) | 0,
+    s = sec % 60;
   return m + ":" + String(s).padStart(2, "0");
 }
 
@@ -130,15 +140,26 @@ function startSourceRefresh() {
   sourceRefreshTimer = setInterval(loadSources, 3000);
 }
 function stopSourceRefresh() {
-  if (sourceRefreshTimer) { clearInterval(sourceRefreshTimer); sourceRefreshTimer = null; }
+  if (sourceRefreshTimer) {
+    clearInterval(sourceRefreshTimer);
+    sourceRefreshTimer = null;
+  }
 }
 
 async function loadDevices() {
   try {
     const devices = await navigator.mediaDevices.enumerateDevices();
-    fillSelect(camSelect, devices.filter((d) => d.kind === "videoinput"), "Camera");
-    fillSelect(micSelect, devices.filter((d) => d.kind === "audioinput"), "Microphone");
-  } catch (e) {}
+    fillSelect(
+      camSelect,
+      devices.filter((d) => d.kind === "videoinput"),
+      "Camera"
+    );
+    fillSelect(
+      micSelect,
+      devices.filter((d) => d.kind === "audioinput"),
+      "Microphone"
+    );
+  } catch {}
 }
 
 function fmtRecordingDate(epoch) {
@@ -146,7 +167,9 @@ function fmtRecordingDate(epoch) {
   const today = new Date();
   const sameDay = d.toDateString() === today.toDateString();
   const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  return sameDay ? `Today · ${time}` : `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${time}`;
+  return sameDay
+    ? `Today · ${time}`
+    : `${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · ${time}`;
 }
 
 // Recordings are saved to disk the moment a take finishes (recordingFinish
@@ -215,7 +238,9 @@ async function openCamPreview() {
 }
 
 function closeCamPreview() {
-  try { camStream && camStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
+  try {
+    camStream && camStream.getTracks().forEach((t) => t.stop());
+  } catch {}
   camStream = null;
   camPreview.srcObject = null;
   camWrap.classList.remove("show");
@@ -235,7 +260,10 @@ camSelect.onchange = () => {
 syncSelectVisibility();
 
 async function startRecording() {
-  if (!selectedSource) { showErr("Pick a screen or window first."); return; }
+  if (!selectedSource) {
+    showErr("Pick a screen or window first.");
+    return;
+  }
   errEl.style.display = "none";
   btn.disabled = true;
   stopSourceRefresh();
@@ -248,9 +276,15 @@ async function startRecording() {
   // silently fold a leftover track from the last session into this one.
   // camStream is deliberately spared: it's the live self-view preview, and
   // this take reuses it rather than reopening the device.
-  [displayStream, sysStream, micStream].forEach((s) => { try { s && s.getTracks().forEach((t) => t.stop()); } catch (e) {} });
-  try { audioCtx && audioCtx.close(); } catch (e) {}
-  displayStream = null; sysStream = null; micStream = null; audioCtx = null;
+  [displayStream, sysStream, micStream].forEach((s) => {
+    try {
+      s && s.getTracks().forEach((t) => t.stop());
+    } catch {}
+  });
+  releaseAudioGraph();
+  displayStream = null;
+  sysStream = null;
+  micStream = null;
 
   try {
     const wantSysAudio = sysToggle.checked;
@@ -273,14 +307,18 @@ async function startRecording() {
     // pushing everything after it out of sync. So the slow, non-audio setup
     // (camera device negotiation) happens FIRST, and each audio source is
     // opened as late as its own ordering constraint allows.
-    let hasCam = false, camError = null;
+    let hasCam = false,
+      camError = null;
     if (camToggle.checked) {
       try {
         // Normally already open from the preview — this only runs if the
         // preview failed or was never shown.
-        if (!camStream) camStream = await navigator.mediaDevices.getUserMedia({ video: camConstraints() });
+        if (!camStream)
+          camStream = await navigator.mediaDevices.getUserMedia({ video: camConstraints() });
         hasCam = true;
-      } catch (e) { camError = `${e.name}: ${e.message}`; }
+      } catch (e) {
+        camError = `${e.name}: ${e.message}`;
+      }
     }
 
     // System audio: the classic chromeMediaSource:"desktop" path, NOT
@@ -297,14 +335,20 @@ async function startRecording() {
     if (wantSysAudio) {
       try {
         sysStream = await navigator.mediaDevices.getUserMedia({
-          audio: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: selectedSource.id } },
-          video: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: selectedSource.id } },
+          audio: {
+            mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: selectedSource.id },
+          },
+          video: {
+            mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: selectedSource.id },
+          },
         });
         sysStream.getVideoTracks().forEach((t) => t.stop());
         // Give Chromium a beat to actually tear down that capture session
         // before the next one opens on the same source.
         await new Promise((r) => setTimeout(r, 150));
-      } catch (e) { sysError = `${e.name}: ${e.message}`; }
+      } catch (e) {
+        sysError = `${e.name}: ${e.message}`;
+      }
     }
 
     // Video: getDisplayMedia so we get cursor:"never" (no OS cursor baked in).
@@ -329,13 +373,22 @@ async function startRecording() {
         //    a backlog still flushing after you hit stop.
         //  - with system audio also being recorded, AEC actively subtracts the
         //    speaker output from the mic signal, mangling it on purpose.
-        const constraints = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+        const constraints = {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        };
         if (micSelect.value) constraints.deviceId = { exact: micSelect.value };
         micStream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
-      } catch (e) { micError = `${e.name}: ${e.message}`; }
+      } catch (e) {
+        micError = `${e.name}: ${e.message}`;
+      }
     }
 
-    const audioSources = [...(sysStream ? sysStream.getAudioTracks() : []), ...(micStream ? micStream.getAudioTracks() : [])];
+    const audioSources = [
+      ...(sysStream ? sysStream.getAudioTracks() : []),
+      ...(micStream ? micStream.getAudioTracks() : []),
+    ];
     let audioTrack = null;
     if (audioSources.length === 1) {
       audioTrack = audioSources[0];
@@ -374,7 +427,15 @@ async function startRecording() {
         const src = meterCtx.createMediaStreamSource(new MediaStream([t]));
         src.connect(analyser);
         // src kept on the object for the same GC reason as the mixer nodes.
-        return { name, src, analyser, buf: new Float32Array(analyser.fftSize), active: 0, samples: 0, peak: 0 };
+        return {
+          name,
+          src,
+          analyser,
+          buf: new Float32Array(analyser.fftSize),
+          active: 0,
+          samples: 0,
+          peak: 0,
+        };
       });
     }
 
@@ -428,7 +489,12 @@ async function startRecording() {
     await warm.play().catch(() => {});
     await new Promise((res) => {
       let settled = false;
-      const done = () => { if (!settled) { settled = true; res(); } };
+      const done = () => {
+        if (!settled) {
+          settled = true;
+          res();
+        }
+      };
       if (warm.requestVideoFrameCallback) warm.requestVideoFrameCallback(done);
       else warm.onloadeddata = done;
       setTimeout(done, 1500);
@@ -453,16 +519,28 @@ async function startRecording() {
     // players wait for it forever and never start. With mic, camera and system
     // audio all off there is no audio track at all, which is how this got hit.
     const mime = audioTrack
-      ? (MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm")
-      : (MediaRecorder.isTypeSupported("video/webm;codecs=vp8") ? "video/webm;codecs=vp8" : "video/webm");
-    screenRecorder = new MediaRecorder(screenStream, { mimeType: mime, videoBitsPerSecond: 16_000_000 });
+      ? MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+        ? "video/webm;codecs=vp8,opus"
+        : "video/webm"
+      : MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+        ? "video/webm;codecs=vp8"
+        : "video/webm";
+    screenRecorder = new MediaRecorder(screenStream, {
+      mimeType: mime,
+      videoBitsPerSecond: 16_000_000,
+    });
     screenRecorder.ondataavailable = (e) => {
       if (!e.data || !e.data.size) return;
       pendingChunks++;
-      e.data.arrayBuffer().then((buf) => {
-        window.zr.recordingChunk(sid, "screen", buf);
-        pendingChunks--;
-      }).catch(() => { pendingChunks--; });
+      e.data
+        .arrayBuffer()
+        .then((buf) => {
+          window.zr.recordingChunk(sid, "screen", buf);
+          pendingChunks--;
+        })
+        .catch(() => {
+          pendingChunks--;
+        });
     };
     screenRecorder.start(250);
     // Stamped HERE, not after the camera/mic recorders are wired up further
@@ -478,15 +556,25 @@ async function startRecording() {
       // camera's capture pool exhausts — Chromium then spams "Failed to
       // reserve output capture buffer" and the feed stalls. VP8 on a 640px
       // circle is visually indistinguishable and far cheaper.
-      const camMime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8") ? "video/webm;codecs=vp8" : "video/webm";
-      camRecorder = new MediaRecorder(camStream, { mimeType: camMime, videoBitsPerSecond: 2_500_000 });
+      const camMime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+        ? "video/webm;codecs=vp8"
+        : "video/webm";
+      camRecorder = new MediaRecorder(camStream, {
+        mimeType: camMime,
+        videoBitsPerSecond: 2_500_000,
+      });
       camRecorder.ondataavailable = (e) => {
         if (!e.data || !e.data.size) return;
         pendingChunks++;
-        e.data.arrayBuffer().then((buf) => {
-          window.zr.recordingChunk(sid, "cam", buf);
-          pendingChunks--;
-        }).catch(() => { pendingChunks--; });
+        e.data
+          .arrayBuffer()
+          .then((buf) => {
+            window.zr.recordingChunk(sid, "cam", buf);
+            pendingChunks--;
+          })
+          .catch(() => {
+            pendingChunks--;
+          });
       };
       camRecorder.start(250);
       // Detach the self-view once the encoder owns the stream. A <video> in a
@@ -503,14 +591,21 @@ async function startRecording() {
     // ever contains sound the mic didn't hear, comparing this against
     // screen.webm says immediately which side of the pipeline put it there.
     if (micStream) {
-      micRecorder = new MediaRecorder(new MediaStream(micStream.getAudioTracks()), { mimeType: "audio/webm;codecs=opus" });
+      micRecorder = new MediaRecorder(new MediaStream(micStream.getAudioTracks()), {
+        mimeType: "audio/webm;codecs=opus",
+      });
       micRecorder.ondataavailable = (e) => {
         if (!e.data || !e.data.size) return;
         pendingChunks++;
-        e.data.arrayBuffer().then((buf) => {
-          window.zr.recordingChunk(sid, "mic", buf);
-          pendingChunks--;
-        }).catch(() => { pendingChunks--; });
+        e.data
+          .arrayBuffer()
+          .then((buf) => {
+            window.zr.recordingChunk(sid, "mic", buf);
+            pendingChunks--;
+          })
+          .catch(() => {
+            pendingChunks--;
+          });
       };
       micRecorder.start(250);
     }
@@ -538,22 +633,48 @@ async function startRecording() {
     }, 250);
 
     if (camError || micError || sysError) {
-      showErr([camError && "Camera: " + camError, micError && "Microphone: " + micError, sysError && "System audio: " + sysError].filter(Boolean).join(" · "));
+      showErr(
+        [
+          camError && "Camera: " + camError,
+          micError && "Microphone: " + micError,
+          sysError && "System audio: " + sysError,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      );
     }
 
-    displayStream.getVideoTracks()[0]?.addEventListener("ended", () => { if (recording) stopRecording(); });
+    displayStream.getVideoTracks()[0]?.addEventListener("ended", () => {
+      if (recording) stopRecording();
+    });
 
-    window.__zrCaptureInfo = { width: settings.width || null, height: settings.height || null, hasCam, camError, micError };
+    window.__zrCaptureInfo = {
+      width: settings.width || null,
+      height: settings.height || null,
+      hasCam,
+      camError,
+      micError,
+    };
   } catch (e) {
-    if (stopInputTracking) { stopInputTracking(); stopInputTracking = null; }
+    if (stopInputTracking) {
+      stopInputTracking();
+      stopInputTracking = null;
+    }
     window.zr.stopTracking();
     window.zr.unsilence();
     // Release everything acquired before the failure — without this, a
     // failed start leaves the mic/cam/screen streams live indefinitely
     // (Windows shows the mic as permanently in use).
-    [displayStream, sysStream, micStream, camStream].forEach((s) => { try { s && s.getTracks().forEach((t) => t.stop()); } catch (_) {} });
-    try { audioCtx && audioCtx.close(); } catch (_) {}
-    displayStream = null; sysStream = null; micStream = null; camStream = null; audioCtx = null; audioNodes = [];
+    [displayStream, sysStream, micStream, camStream].forEach((s) => {
+      try {
+        s && s.getTracks().forEach((t) => t.stop());
+      } catch {}
+    });
+    releaseAudioGraph();
+    displayStream = null;
+    sysStream = null;
+    micStream = null;
+    camStream = null;
     camPreview.srcObject = null;
     camWrap.classList.remove("show");
     if (camToggle.checked) openCamPreview();
@@ -561,6 +682,20 @@ async function startRecording() {
     btn.disabled = false;
     startSourceRefresh();
   }
+}
+
+/** Disconnect and drop mixer nodes kept alive against Chromium GC. */
+function releaseAudioGraph() {
+  for (const node of audioNodes) {
+    try {
+      node.disconnect();
+    } catch {}
+  }
+  audioNodes = [];
+  try {
+    audioCtx && audioCtx.close();
+  } catch {}
+  audioCtx = null;
 }
 
 let stopping = false;
@@ -589,9 +724,21 @@ async function stopRecording() {
   // fold their leftover tracks into its own audio mix.
   try {
     await Promise.all([
-      new Promise((res) => { if (!screenRecorder || screenRecorder.state === "inactive") return res(); screenRecorder.onstop = res; screenRecorder.stop(); }),
-      new Promise((res) => { if (!camRecorder || camRecorder.state === "inactive") return res(); camRecorder.onstop = res; camRecorder.stop(); }),
-      new Promise((res) => { if (!micRecorder || micRecorder.state === "inactive") return res(); micRecorder.onstop = res; micRecorder.stop(); }),
+      new Promise((res) => {
+        if (!screenRecorder || screenRecorder.state === "inactive") return res();
+        screenRecorder.onstop = res;
+        screenRecorder.stop();
+      }),
+      new Promise((res) => {
+        if (!camRecorder || camRecorder.state === "inactive") return res();
+        camRecorder.onstop = res;
+        camRecorder.stop();
+      }),
+      new Promise((res) => {
+        if (!micRecorder || micRecorder.state === "inactive") return res();
+        micRecorder.onstop = res;
+        micRecorder.stop();
+      }),
     ]);
 
     // Snapshot the audio tracks while they're still live — stopping them below
@@ -603,11 +750,19 @@ async function stopRecording() {
       };
     }
 
-    try { displayStream && displayStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
-    try { sysStream && sysStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
-    try { micStream && micStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
-    try { camStream && camStream.getTracks().forEach((t) => t.stop()); } catch (e) {}
-    try { audioCtx && audioCtx.close(); } catch (e) {}
+    try {
+      displayStream && displayStream.getTracks().forEach((t) => t.stop());
+    } catch {}
+    try {
+      sysStream && sysStream.getTracks().forEach((t) => t.stop());
+    } catch {}
+    try {
+      micStream && micStream.getTracks().forEach((t) => t.stop());
+    } catch {}
+    try {
+      camStream && camStream.getTracks().forEach((t) => t.stop());
+    } catch {}
+    releaseAudioGraph();
 
     // Final MediaRecorder chunks are async (arrayBuffer) — don't close the
     // write streams until they've actually been sent to main.
@@ -633,11 +788,20 @@ async function stopRecording() {
 
     window.zr.openEditor(sessionId);
   } finally {
-    try { meterCtx && meterCtx !== audioCtx && meterCtx.close(); } catch (e) {}
-    meterCtx = null; audioMeters = [];
+    try {
+      meterCtx && meterCtx.close();
+    } catch {}
+    meterCtx = null;
+    audioMeters = [];
     recording = false;
-    screenRecorder = null; camRecorder = null; micRecorder = null;
-    displayStream = null; sysStream = null; micStream = null; camStream = null; audioCtx = null; audioNodes = [];
+    screenRecorder = null;
+    camRecorder = null;
+    micRecorder = null;
+    displayStream = null;
+    sysStream = null;
+    micStream = null;
+    camStream = null;
+    releaseAudioGraph();
     camPreview.srcObject = null;
     camWrap.classList.remove("show");
     if (camToggle.checked) openCamPreview(); // self-view comes straight back

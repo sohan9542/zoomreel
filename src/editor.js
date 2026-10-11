@@ -7,10 +7,10 @@ const params = new URLSearchParams(location.search);
 const SID = Number(params.get("id"));
 
 const BACKGROUNDS = {
-  aurora:   ["#6d28d9", "#4f46e5"],
-  sunset:   ["#f97316", "#db2777"],
-  ocean:    ["#0ea5e9", "#4f46e5"],
-  mint:     ["#10b981", "#0891b2"],
+  aurora: ["#6d28d9", "#4f46e5"],
+  sunset: ["#f97316", "#db2777"],
+  ocean: ["#0ea5e9", "#4f46e5"],
+  mint: ["#10b981", "#0891b2"],
   graphite: ["#1f2937", "#0b0f19"],
 };
 
@@ -42,7 +42,6 @@ let screenUrl = null;
 let exporting = false;
 let selectedSegment = null;
 let selectedZoomIdx = null;
-let dragBox = null; // { startX, startY, curX, curY } in canvas-wrap CSS pixels, while drawing a manual zoom
 
 init();
 
@@ -59,7 +58,9 @@ async function init() {
   video.src = screenUrl;
   video.playsInline = true;
   video.muted = S.muted;
-  await new Promise((r) => { video.onloadedmetadata = r; });
+  await new Promise((r) => {
+    video.onloadedmetadata = r;
+  });
   if (!isFinite(video.duration)) {
     // MediaRecorder writes no duration into the WebM header, so the only way to
     // learn a take's length is to seek past the end and see where it lands.
@@ -69,13 +70,19 @@ async function init() {
     // the editor opens on a video that simply will not start.
     // load() is the only thing that clears that state, and the duration just
     // discovered survives the reload.
-    await new Promise((r) => { video.onseeked = r; video.currentTime = 1e6; });
+    await new Promise((r) => {
+      video.onseeked = r;
+      video.currentTime = 1e6;
+    });
     video.onseeked = null;
     durationSec = video.duration; // capture before load() throws it away
     video.load();
-    await new Promise((r) => { video.onloadedmetadata = r; });
+    await new Promise((r) => {
+      video.onloadedmetadata = r;
+    });
   }
-  if (!durationSec || !isFinite(durationSec)) durationSec = isFinite(video.duration) ? video.duration : 0;
+  if (!durationSec || !isFinite(durationSec))
+    durationSec = isFinite(video.duration) ? video.duration : 0;
 
   S.segments = [{ start: 0, end: durationSec * 1000, deleted: false }];
   selectedSegment = 0;
@@ -85,7 +92,9 @@ async function init() {
     camVideo.src = result.camUrl;
     camVideo.playsInline = true;
     camVideo.muted = true;
-    await new Promise((r) => { camVideo.onloadedmetadata = r; });
+    await new Promise((r) => {
+      camVideo.onloadedmetadata = r;
+    });
   }
 
   rebuildCamera();
@@ -180,14 +189,17 @@ function loop() {
       const newT = Math.min(skipTo, durMs);
       video.currentTime = newT / 1000;
       if (camVideo) {
-        const camT = Math.min(newT / 1000, Number.isFinite(camVideo.duration) ? camVideo.duration : newT / 1000);
+        const camT = Math.min(
+          newT / 1000,
+          Number.isFinite(camVideo.duration) ? camVideo.duration : newT / 1000
+        );
         camVideo.currentTime = camT;
       }
       t = newT;
     }
   }
   render(t);
-  if (!exporting) updateTransport(t);
+  if (!exporting) updateTransport();
   requestAnimationFrame(loop);
 }
 
@@ -203,7 +215,9 @@ function render(t) {
     if (Math.abs(camVideo.currentTime - target) > 0.15) camVideo.currentTime = target;
   }
   const frame = ZR_CAMERA.evaluate(t, prepared, S);
-  lastFrame.cx = frame.cx; lastFrame.cy = frame.cy; lastFrame.zoom = frame.zoom;
+  lastFrame.cx = frame.cx;
+  lastFrame.cy = frame.cy;
+  lastFrame.zoom = frame.zoom;
   draw(frame.cx, frame.cy, frame.zoom, t);
 }
 
@@ -213,13 +227,16 @@ function render(t) {
 let lastFrame = { cx: 0.5, cy: 0.5, zoom: 1 };
 
 function getViewport() {
-  const W = canvas.width, H = canvas.height;
-  const padH = W * S.pad, padV = H * S.pad;
+  const W = canvas.width,
+    H = canvas.height;
+  const padH = W * S.pad,
+    padV = H * S.pad;
   return { W, H, ix: padH, iy: padV, iw: W - padH * 2, ih: H - padV * 2 };
 }
 
 function draw(cx, cy, zoom, t) {
-  const W = canvas.width, H = canvas.height;
+  const W = canvas.width,
+    H = canvas.height;
   const { ix, iy, iw, ih } = getViewport();
   const r = S.radius;
 
@@ -229,9 +246,12 @@ function draw(cx, cy, zoom, t) {
   roundRect(ctx, ix, iy, iw, ih, r);
   ctx.clip();
 
-  const vw = video.videoWidth, vh = video.videoHeight;
-  const cw = vw / zoom, ch = vh / zoom;
-  const sx = cx * vw - cw / 2, sy = cy * vh - ch / 2;
+  const vw = video.videoWidth,
+    vh = video.videoHeight;
+  const cw = vw / zoom,
+    ch = vh / zoom;
+  const sx = cx * vw - cw / 2,
+    sy = cy * vh - ch / 2;
   if (video.readyState >= 2) ctx.drawImage(video, sx, sy, cw, ch, ix, iy, iw, ih);
 
   if (S.showCursor) {
@@ -242,7 +262,8 @@ function draw(cx, cy, zoom, t) {
     // top of that unavoidable real one was two cursors overlapping/
     // flickering. Click/keypress ripples don't have that conflict — they're
     // an added highlight, not a second pointer — so only those remain.
-    const visL = cx - 0.5 / zoom, visT = cy - 0.5 / zoom;
+    const visL = cx - 0.5 / zoom,
+      visT = cy - 0.5 / zoom;
     const invW = 1 / zoom;
     const toScreen = (nx, ny) => ({
       x: ix + ((nx - visL) / invW) * iw,
@@ -279,10 +300,22 @@ function drawWebcamBubble(W, H) {
   const r = size / 2;
   let bx, by;
   switch (S.camCorner) {
-    case "tl": bx = margin + r; by = margin + r; break;
-    case "tr": bx = W - margin - r; by = margin + r; break;
-    case "bl": bx = margin + r; by = H - margin - r; break;
-    default:   bx = W - margin - r; by = H - margin - r; break; // br
+    case "tl":
+      bx = margin + r;
+      by = margin + r;
+      break;
+    case "tr":
+      bx = W - margin - r;
+      by = margin + r;
+      break;
+    case "bl":
+      bx = margin + r;
+      by = H - margin - r;
+      break;
+    default:
+      bx = W - margin - r;
+      by = H - margin - r;
+      break; // br
   }
 
   ctx.save();
@@ -299,9 +332,11 @@ function drawWebcamBubble(W, H) {
   ctx.beginPath();
   ctx.arc(bx, by, r, 0, Math.PI * 2);
   ctx.clip();
-  const vw = camVideo.videoWidth, vh = camVideo.videoHeight;
+  const vw = camVideo.videoWidth,
+    vh = camVideo.videoHeight;
   const scale = Math.max(size / vw, size / vh);
-  const dw = vw * scale, dh = vh * scale;
+  const dw = vw * scale,
+    dh = vh * scale;
   ctx.drawImage(camVideo, bx - dw / 2, by - dh / 2, dw, dh);
   ctx.restore();
 
@@ -320,7 +355,8 @@ function drawWebcamBubble(W, H) {
 // canvas and blitted instead; the cache rebuilds only when something it
 // depends on actually changes. Export captures this same canvas in real time,
 // so the cost came straight out of the exported frame rate too.
-let bgCache = null, bgKey = "";
+let bgCache = null,
+  bgKey = "";
 
 function paintBackdrop(W, H, ix, iy, iw, ih, r) {
   const key = [W, H, S.bg, ix, iy, iw, ih, r].join("|");
@@ -336,7 +372,14 @@ function paintBackdrop(W, H, ix, iy, iw, ih, r) {
     g.addColorStop(1, c2);
     b.fillStyle = g;
     b.fillRect(0, 0, W, H);
-    const rg = b.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.75);
+    const rg = b.createRadialGradient(
+      W / 2,
+      H / 2,
+      Math.min(W, H) * 0.2,
+      W / 2,
+      H / 2,
+      Math.max(W, H) * 0.75
+    );
     rg.addColorStop(0, "rgba(0,0,0,0)");
     rg.addColorStop(1, "rgba(0,0,0,0.28)");
     b.fillStyle = rg;
@@ -427,7 +470,11 @@ function updateDeleteBtnLabel() {
   const btn = document.getElementById("deleteBtn");
   if (!btn) return;
   const seg = selectedSegment !== null ? S.segments[selectedSegment] : null;
-  if (!seg) { btn.disabled = true; btn.textContent = "Delete clip"; return; }
+  if (!seg) {
+    btn.disabled = true;
+    btn.textContent = "Delete clip";
+    return;
+  }
   btn.disabled = false;
   btn.textContent = seg.deleted ? "Restore clip" : "Delete clip";
 }
@@ -439,7 +486,8 @@ function renderSegments() {
   overlay.innerHTML = "";
   S.segments.forEach((seg, i) => {
     const div = document.createElement("div");
-    div.className = "seg-block" + (seg.deleted ? " deleted" : "") + (i === selectedSegment ? " selected" : "");
+    div.className =
+      "seg-block" + (seg.deleted ? " deleted" : "") + (i === selectedSegment ? " selected" : "");
     div.style.left = (seg.start / durMs) * 100 + "%";
     div.style.width = Math.max(0.2, ((seg.end - seg.start) / durMs) * 100) + "%";
     overlay.appendChild(div);
@@ -486,9 +534,10 @@ function setZoomMode(mode) {
   document.getElementById("zoomLevelGroup").style.display = mode === "manual" ? "none" : "";
   document.getElementById("zoomTrackWrap").style.display = mode === "manual" ? "" : "none";
   canvas.classList.toggle("manual-mode", mode === "manual");
-  document.getElementById("modeHint").textContent = mode === "manual"
-    ? "Click and drag on the video to pick what to zoom into. Drag the blocks below to move or resize them, Delete to remove."
-    : "Zooms in on clicks and typing, eases out when you move or go idle.";
+  document.getElementById("modeHint").textContent =
+    mode === "manual"
+      ? "Click and drag on the video to pick what to zoom into. Drag the blocks below to move or resize them, Delete to remove."
+      : "Zooms in on clicks and typing, eases out when you move or go idle.";
   rebuildCamera();
   if (mode === "manual") renderZoomTrack();
 }
@@ -501,7 +550,8 @@ function setZoomMode(mode) {
 function canvasPxToNorm(px, py, cx, cy, zoom) {
   const { ix, iy, iw, ih } = getViewport();
   const invW = 1 / zoom;
-  const visL = cx - 0.5 * invW, visT = cy - 0.5 * invW;
+  const visL = cx - 0.5 * invW,
+    visT = cy - 0.5 * invW;
   return {
     x: clamp01(visL + ((px - ix) / iw) * invW),
     y: clamp01(visT + ((py - iy) / ih) * invW),
@@ -519,7 +569,8 @@ function setupZoomSelection() {
   }
 
   function updateBoxStyle() {
-    const x1 = Math.min(drag.startX, drag.curX), y1 = Math.min(drag.startY, drag.curY);
+    const x1 = Math.min(drag.startX, drag.curX),
+      y1 = Math.min(drag.startY, drag.curY);
     box.style.left = x1 + "px";
     box.style.top = y1 + "px";
     box.style.width = Math.abs(drag.curX - drag.startX) + "px";
@@ -538,7 +589,8 @@ function setupZoomSelection() {
 
     const onMove = (ev) => {
       const mp = toWrapPx(ev.clientX, ev.clientY);
-      drag.curX = mp.x; drag.curY = mp.y;
+      drag.curX = mp.x;
+      drag.curY = mp.y;
       updateBoxStyle();
     };
     const onUp = () => {
@@ -554,13 +606,16 @@ function setupZoomSelection() {
 }
 
 function finishZoomSelection(drag) {
-  const wPx = Math.abs(drag.curX - drag.startX), hPx = Math.abs(drag.curY - drag.startY);
+  const wPx = Math.abs(drag.curX - drag.startX),
+    hPx = Math.abs(drag.curY - drag.startY);
   if (wPx < 12 || hPx < 12) return; // too small to be a deliberate drag — ignore stray clicks
 
   const canvasRect = canvas.getBoundingClientRect();
   const wrapRect = canvas.parentElement.getBoundingClientRect();
-  const offX = canvasRect.left - wrapRect.left, offY = canvasRect.top - wrapRect.top;
-  const scaleX = canvas.width / canvasRect.width, scaleY = canvas.height / canvasRect.height;
+  const offX = canvasRect.left - wrapRect.left,
+    offY = canvasRect.top - wrapRect.top;
+  const scaleX = canvas.width / canvasRect.width,
+    scaleY = canvas.height / canvasRect.height;
   const toCanvasPx = (wx, wy) => ({ x: (wx - offX) * scaleX, y: (wy - offY) * scaleY });
 
   const c1 = toCanvasPx(drag.startX, drag.startY);
@@ -569,8 +624,10 @@ function finishZoomSelection(drag) {
   const n1 = canvasPxToNorm(c1.x, c1.y, curCx, curCy, curZoom);
   const n2 = canvasPxToNorm(c2.x, c2.y, curCx, curCy, curZoom);
 
-  const cx = (n1.x + n2.x) / 2, cy = (n1.y + n2.y) / 2;
-  const dx = Math.max(0.02, Math.abs(n2.x - n1.x)), dy = Math.max(0.02, Math.abs(n2.y - n1.y));
+  const cx = (n1.x + n2.x) / 2,
+    cy = (n1.y + n2.y) / 2;
+  const dx = Math.max(0.02, Math.abs(n2.x - n1.x)),
+    dy = Math.max(0.02, Math.abs(n2.y - n1.y));
   const zoom = clamp(Math.min(1 / dx, 1 / dy), 1.1, 4);
 
   const totalMs = durationSec * 1000;
@@ -607,7 +664,8 @@ function renderZoomTrack() {
       const isLeft = e.target.classList.contains("left");
       const isRight = e.target.classList.contains("right");
       const startClientX = e.clientX;
-      const origStart = z.start, origEnd = z.end;
+      const origStart = z.start,
+        origEnd = z.end;
       const trackRect = trackEl.getBoundingClientRect();
 
       const onMove = (ev) => {
@@ -654,7 +712,9 @@ async function generateThumbnails() {
   const tVideo = document.createElement("video");
   tVideo.muted = true;
   tVideo.src = screenUrl;
-  await new Promise((res) => { tVideo.onloadedmetadata = res; });
+  await new Promise((res) => {
+    tVideo.onloadedmetadata = res;
+  });
 
   const tw = 96;
   const th = Math.max(1, Math.round(tw * (tVideo.videoHeight / tVideo.videoWidth || 0.6)));
@@ -669,7 +729,10 @@ async function generateThumbnails() {
   const dur = durationSec;
   for (let i = 0; i < count; i++) {
     const t = (dur * (i + 0.5)) / count;
-    await new Promise((res) => { tVideo.onseeked = res; tVideo.currentTime = t; });
+    await new Promise((res) => {
+      tVideo.onseeked = res;
+      tVideo.currentTime = t;
+    });
     tctx.drawImage(tVideo, 0, 0, tw, th);
     const img = document.createElement("img");
     img.className = "thumb";
@@ -683,11 +746,12 @@ async function generateThumbnails() {
 
 function fmt(sec) {
   sec = Math.max(0, sec | 0);
-  const m = (sec / 60) | 0, s = sec % 60;
+  const m = (sec / 60) | 0,
+    s = sec % 60;
   return m + ":" + String(s).padStart(2, "0");
 }
 
-function updateTransport(tMs) {
+function updateTransport() {
   const dur = durationSec;
   const playhead = document.getElementById("playhead");
   if (playhead) playhead.style.left = (dur ? (video.currentTime / dur) * 100 : 0) + "%";
@@ -711,12 +775,18 @@ function buildControls() {
   $("play").onclick = () => {
     if (video.paused) {
       // Surface a refused play instead of leaving a button that does nothing.
-      video.play().catch((e) => { $("expNote").textContent = "Can't play this recording: " + e.name + " — " + e.message; });
+      video.play().catch((e) => {
+        $("expNote").textContent = "Can't play this recording: " + e.name + " — " + e.message;
+      });
       camVideo && camVideo.play().catch(() => {});
-    } else { video.pause(); camVideo && camVideo.pause(); }
+    } else {
+      video.pause();
+      camVideo && camVideo.pause();
+    }
   };
   $("mute").onclick = () => {
-    S.muted = !S.muted; video.muted = S.muted;
+    S.muted = !S.muted;
+    video.muted = S.muted;
     $("mute").textContent = S.muted ? "🔇" : "🔈";
   };
   setupTimelineDrag();
@@ -734,9 +804,17 @@ function buildControls() {
     $("smoothV").textContent = smoothLabel(S.smooth);
     rebuildCamera();
   };
-  $("pad").oninput = (e) => { S.pad = +e.target.value; $("padV").textContent = Math.round(S.pad * 100) + "%"; };
-  $("rad").oninput = (e) => { S.radius = +e.target.value; $("radV").textContent = String(S.radius); };
-  $("cursor").onchange = (e) => { S.showCursor = e.target.checked; };
+  $("pad").oninput = (e) => {
+    S.pad = +e.target.value;
+    $("padV").textContent = Math.round(S.pad * 100) + "%";
+  };
+  $("rad").oninput = (e) => {
+    S.radius = +e.target.value;
+    $("radV").textContent = String(S.radius);
+  };
+  $("cursor").onchange = (e) => {
+    S.showCursor = e.target.checked;
+  };
 
   const bgs = $("bgs");
   Object.keys(BACKGROUNDS).forEach((name) => {
@@ -764,14 +842,20 @@ function buildControls() {
   }
 
   $("camToggle").checked = S.camEnabled;
-  $("camToggle").onchange = (e) => { S.camEnabled = e.target.checked; };
+  $("camToggle").onchange = (e) => {
+    S.camEnabled = e.target.checked;
+  };
   $("camSizeCtl").value = S.camSize;
-  $("camSizeCtl").oninput = (e) => { S.camSize = +e.target.value; };
+  $("camSizeCtl").oninput = (e) => {
+    S.camSize = +e.target.value;
+  };
   [...document.querySelectorAll("#camCorners button")].forEach((b) => {
     if (b.dataset.corner === S.camCorner) b.classList.add("sel");
     b.onclick = () => {
       S.camCorner = b.dataset.corner;
-      [...document.querySelectorAll("#camCorners button")].forEach((c) => c.classList.remove("sel"));
+      [...document.querySelectorAll("#camCorners button")].forEach((c) =>
+        c.classList.remove("sel")
+      );
       b.classList.add("sel");
     };
   });
@@ -790,8 +874,12 @@ function buildControls() {
     if (camVideo) camVideo.pause();
     // Release the file handles first — the <video> elements keep the .webm
     // files open, and Windows won't let the main process delete open files.
-    video.removeAttribute("src"); video.load();
-    if (camVideo) { camVideo.removeAttribute("src"); camVideo.load(); }
+    video.removeAttribute("src");
+    video.load();
+    if (camVideo) {
+      camVideo.removeAttribute("src");
+      camVideo.load();
+    }
     await window.zr.deleteSession(SID);
     window.zr.recordAgain();
   };
@@ -841,14 +929,18 @@ function pickVideoMime(format, withAudio) {
     return candidates.find((c) => MediaRecorder.isTypeSupported(c)) || null;
   }
   if (!withAudio) {
-    return MediaRecorder.isTypeSupported("video/webm;codecs=vp8") ? "video/webm;codecs=vp8" : "video/webm";
+    return MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
+      ? "video/webm;codecs=vp8"
+      : "video/webm";
   }
   // VP8, not VP9. Export captures this canvas in real time, so an encoder that
   // can't sustain 30fps doesn't just take longer — it drops frames, and the
   // export itself comes out stuttering. VP9 software encode at this size is
   // well beyond a laptop CPU; VP8 keeps up, and the bitrate below buys back
   // the per-frame quality difference.
-  return MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm";
+  return MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus")
+    ? "video/webm;codecs=vp8,opus"
+    : "video/webm";
 }
 
 async function saveBlobAs(blob, defaultName) {
@@ -869,9 +961,11 @@ async function exportVideo(format) {
   let audioTracks = [];
   try {
     video.muted = false;
-    const vs = video.captureStream ? video.captureStream() : (video.mozCaptureStream && video.mozCaptureStream());
+    const vs = video.captureStream
+      ? video.captureStream()
+      : video.mozCaptureStream && video.mozCaptureStream();
     if (vs) audioTracks = vs.getAudioTracks();
-  } catch (e) {}
+  } catch {}
 
   // Picked only now that we know whether there is real audio to declare.
   const mime = pickVideoMime(format, audioTracks.length > 0);
@@ -887,8 +981,12 @@ async function exportVideo(format) {
   const out = new MediaStream([...cstream.getVideoTracks(), ...audioTracks]);
   const rec = new MediaRecorder(out, { mimeType: mime, videoBitsPerSecond: 20_000_000 });
   const parts = [];
-  rec.ondataavailable = (e) => { if (e.data && e.data.size) parts.push(e.data); };
-  const done = new Promise((res) => { rec.onstop = res; });
+  rec.ondataavailable = (e) => {
+    if (e.data && e.data.size) parts.push(e.data);
+  };
+  const done = new Promise((res) => {
+    rec.onstop = res;
+  });
 
   // Play through the WHOLE recording in one continuous, uninterrupted pass —
   // never pausing — and jump forward past cut regions while still playing.
@@ -913,8 +1011,12 @@ async function exportVideo(format) {
         curMs = newT;
       }
       const totalMs = durationSec * 1000;
-      note.textContent = "Exporting… " + Math.min(100, Math.round((curMs / (totalMs || 1)) * 100)) + "%";
-      if (video.ended || curMs >= totalMs - 5) { res(); return; }
+      note.textContent =
+        "Exporting… " + Math.min(100, Math.round((curMs / (totalMs || 1)) * 100)) + "%";
+      if (video.ended || curMs >= totalMs - 5) {
+        res();
+        return;
+      }
       requestAnimationFrame(tick);
     };
     video.addEventListener("ended", res, { once: true });
@@ -933,7 +1035,9 @@ async function exportVideo(format) {
   video.muted = S.muted;
   exporting = false;
   setExportButtonsDisabled(false);
-  note.textContent = saveResult.ok ? "Saved to " + saveResult.filePath : "Export ready, but save was cancelled.";
+  note.textContent = saveResult.ok
+    ? "Saved to " + saveResult.filePath
+    : "Export ready, but save was cancelled.";
 }
 
 /* ---------- export as GIF (frame capture, no audio) ---------- */
@@ -959,7 +1063,7 @@ async function exportGif() {
     dither: "FloydSteinberg",
     width: gw,
     height: gh,
-    workerScript: "gif.worker.js",
+    workerScript: "vendor/gif.worker.js",
   });
 
   const frameCanvas = document.createElement("canvas");
@@ -985,7 +1089,10 @@ async function exportGif() {
     await new Promise((res) => {
       const tick = () => {
         const curMs = video.currentTime * 1000;
-        if (video.ended || curMs >= seg.end - 5) { res(); return; }
+        if (video.ended || curMs >= seg.end - 5) {
+          res();
+          return;
+        }
         if (curMs - lastCapturedMs >= frameIntervalMs) {
           const now = performance.now();
           const delay = lastCaptureClock === null ? frameIntervalMs : now - lastCaptureClock;
@@ -994,7 +1101,8 @@ async function exportGif() {
           lastCapturedMs = curMs;
           lastCaptureClock = now;
           const overall = playedMs + Math.max(0, curMs - segStartMs);
-          note.textContent = "Capturing frames… " + Math.min(100, Math.round((overall / totalKeptMs) * 100)) + "%";
+          note.textContent =
+            "Capturing frames… " + Math.min(100, Math.round((overall / totalKeptMs) * 100)) + "%";
         }
         requestAnimationFrame(tick);
       };
@@ -1008,7 +1116,9 @@ async function exportGif() {
 
   note.textContent = "Encoding GIF…";
   const outBlob = await new Promise((res) => {
-    gif.on("progress", (p) => { note.textContent = "Encoding GIF… " + Math.round(p * 100) + "%"; });
+    gif.on("progress", (p) => {
+      note.textContent = "Encoding GIF… " + Math.round(p * 100) + "%";
+    });
     gif.on("finished", (blob) => res(blob));
     gif.render();
   });
