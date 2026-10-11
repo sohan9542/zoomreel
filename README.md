@@ -91,7 +91,7 @@ zoomreel/
 │   └── vendor/          # Bundled gif.js + worker
 ├── build/
 │   └── icon.png         # App / installer icon
-├── test/
+├── tests/
 │   └── camera.test.js
 ├── .github/workflows/ci.yml
 ├── package.json

@@ -17,7 +17,7 @@ module.exports = [
   js.configs.recommended,
   prettier,
   {
-    files: ["src/main.js", "src/preload.js", "test/**/*.js", "eslint.config.js"],
+    files: ["src/main.js", "src/preload.js", "tests/**/*.js", "eslint.config.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "commonjs",

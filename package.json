@@ -14,7 +14,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "node --test test",
+    "test": "node --test tests/camera.test.js",
     "ci": "npm run lint && npm run format:check && npm test"
   },
   "devDependencies": {
@@ -43,7 +43,7 @@
       "package.json",
       "!**/node_modules/*/{CHANGELOG.md,README.md,readme.md,.git}",
       "!dist/**/*",
-      "!test/**/*",
+      "!tests/**/*",
       "!**/*.test.js"
     ],
     "win": {
