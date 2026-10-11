@@ -1,41 +1,117 @@
-# ZoomReel (desktop)
+# ZoomReel
 
-Auto-zoom screen recorder — Electron port of the ZoomReel browser extension.
+**ZoomReel** is an Electron desktop app that records your screen (and optional webcam / mic / system audio), then applies Screen Studio–style cinematic auto-zoom in a built-in editor. Zooms follow clicks and typing, ease out on scroll or inactivity, and can be overridden with manual zoom regions. Export to WebM, MP4, or GIF.
 
-## Run in development
+There is no hosted web app or Chrome Web Store listing for this repository — it is a local desktop application you run or package yourself.
+
+> Electron port of an earlier ZoomReel browser-extension prototype. This repo is the desktop app only.
+
+## Features
+
+- Screen or window capture via Electron `desktopCapturer` / `getDisplayMedia`
+- Optional webcam bubble, microphone, and system-audio capture
+- Global cursor / click / key / scroll tracking to drive auto-zoom
+- Offline camera simulation (`camera.js`) — scrubbing and export share the same track
+- Editor: framing, padding, backgrounds, trim/cut timeline, manual zoom regions
+- Recordings streamed to disk under the app userData folder (no IndexedDB quota limits)
+- Windows NSIS installer via `electron-builder`
+
+## Tech stack
+
+| Layer          | Choice                                                         |
+| -------------- | -------------------------------------------------------------- |
+| Runtime        | Electron 32                                                    |
+| Main / preload | Node.js (CommonJS)                                             |
+| Renderer       | Vanilla HTML / CSS / JS                                        |
+| Input hooks    | `uiohook-napi` (optional; falls back to cursor-move tracking)  |
+| GIF export     | Bundled [gif.js](https://github.com/jnordberg/gif.js)          |
+| Packaging      | electron-builder (NSIS)                                        |
+| Quality        | ESLint, Prettier, Node.js built-in test runner, GitHub Actions |
+
+## Architecture
 
 ```
+Recorder window (index.html) ──IPC──► Main process (main.js)
+        │                                  │
+        │  cursor / click / key events     │ desktopCapturer, file I/O,
+        │  MediaRecorder chunks ──────────►│ window lifecycle, uIOhook
+        │                                  │
+        └── openEditor(id) ───────────────► Editor window (editor.html)
+                                              │
+                                              ├─ camera.js  (pure zoom math)
+                                              └─ vendor/gif.js (export)
+```
+
+- **`src/main.js`** — single app instance, source picking, input tracking, recording storage, editor windows.
+- **`src/preload.js`** — `contextBridge` API exposed as `window.zr` (context isolation on, Node integration off).
+- **`src/index.html` / `index.js`** — recorder UI and capture pipeline.
+- **`src/editor.html` / `editor.js`** — preview, trim, styling, export.
+- **`src/camera.js`** — pure cinematic camera algorithm (also unit-tested under Node).
+
+Recordings live at `app.getPath('userData')/recordings/<id>/` (`screen.webm`, optional `cam.webm` / `mic.webm`, `meta.json`).
+
+## Requirements
+
+- Node.js 18+ (CI uses Node 20)
+- npm
+- Platform support targets **Windows** for the packaged installer; development can run wherever Electron runs (native `uiohook-napi` may be unavailable on some setups — the app still starts)
+
+## Local development
+
+```bash
 npm install
 npm start
 ```
 
-## Build a Windows installer
+That launches the Electron recorder window. Pick a screen or window, optionally enable camera / mic / system audio, then start recording. When you stop, the editor opens on that take.
+
+## Scripts
+
+| Script                 | Purpose                                       |
+| ---------------------- | --------------------------------------------- |
+| `npm start`            | Run the app in development                    |
+| `npm run build`        | Package a Windows NSIS installer into `dist/` |
+| `npm test`             | Unit tests for the camera algorithm           |
+| `npm run lint`         | ESLint                                        |
+| `npm run format`       | Prettier write                                |
+| `npm run format:check` | Prettier check (CI)                           |
+| `npm run ci`           | lint + format check + test                    |
+
+## Project structure
 
 ```
+zoomreel/
+├── src/
+│   ├── main.js          # Electron main process
+│   ├── preload.js       # Secure IPC bridge → window.zr
+│   ├── camera.js        # Auto-zoom algorithm
+│   ├── index.html/.js   # Recorder UI
+│   ├── editor.html/.js  # Editor UI
+│   ├── logo.svg
+│   └── vendor/          # Bundled gif.js + worker
+├── build/
+│   └── icon.png         # App / installer icon
+├── test/
+│   └── camera.test.js
+├── .github/workflows/ci.yml
+├── package.json
+└── README.md
+```
+
+## Packaging
+
+```bash
 npm run build
 ```
 
-Produces an NSIS installer in `dist/`.
+Produces an NSIS installer under `dist/` (`com.zoomreel.app`).
 
-## How it's organized
+## Known limitations (v1)
 
-- `main.js` — Electron main process: screen-source picking (`desktopCapturer`), global cursor/click/key tracking (drives the auto-zoom camera), and recording storage on disk (`app.getPath('userData')/recordings/<id>/`).
-- `preload.js` — the only bridge between renderer windows and Node/Electron APIs (`contextBridge`), exposed to renderers as `window.zr`.
-- `index.html` / `index.js` — the recorder window: pick a screen/window + camera/mic, start/stop recording.
-- `editor.html` / `editor.js` — the editor window: cinematic auto-zoom preview, webcam bubble, trim/cut timeline, export to WebM/MP4/GIF. Ported near-unchanged from the extension.
-- `camera.js` — the auto-zoom algorithm itself (pure JS, untouched from the extension).
-- `gif.js` / `gif.worker.js` — bundled GIF encoder (same library the extension used).
+- **No capture-window exclusion.** Recording “Entire screen” includes ZoomReel windows.
+- **`uiohook-napi` is optional.** If it fails to load, auto-zoom still follows cursor movement but not click/key bursts.
+- **Export uses real-time canvas capture** (`MediaRecorder` + `canvas.captureStream()`), so cut points pause briefly rather than frame-perfect splicing.
 
-## What's different from the extension
+## License
 
-Nearly everything that was awkward in the Chrome extension is just gone here:
-- No more offscreen-document-can't-get-camera-permission workaround — one normal window, `getUserMedia` just works.
-- No more service-worker-killed-mid-recording state loss — `main.js` runs as one persistent process for the app's whole lifetime.
-- No more IndexedDB/`chrome.storage.local` quota dance — recordings stream straight to disk.
-- Cursor tracking is more accurate: Electron gives real display bounds, so events are already normalized correctly at the source (no more surface-guessing heuristics).
-
-## Known v1 simplifications
-
-- **No capture-window exclusion.** If you record "Entire screen," any ZoomReel window will appear in the recording, same as the extension. Fixing this needs real per-OS compositor work and is a deliberate v2 item.
-- **Click/keypress detection uses `uiohook-napi`.** If it fails to load on your platform, the app still runs — auto-zoom just falls back to cursor-movement tracking only (no click-triggered zoom bursts).
-- **Export is still real-time canvas capture** (`MediaRecorder` + `canvas.captureStream()`), same as the extension — there's a brief pause at cut points rather than a frame-perfect splice. Swapping this for bundled `ffmpeg` muxing would fix that; deferred as a v2 polish item since the current approach already works.
+Private / unlicensed (`UNLICENSED` in `package.json`). All rights reserved by the author unless otherwise stated.
