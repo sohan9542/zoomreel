@@ -1,0 +1,10 @@
+node_modules
+dist
+dist*
+build
+src/vendor
+package-lock.json
+*.png
+*.svg
+*.webm
+*.mp4
